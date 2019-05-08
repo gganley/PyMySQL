@@ -1,11 +1,17 @@
 import datetime
-import sys
 import time
+import sys
+import os
+import pytz
 import pytest
 import pymysql
 from pymysql.tests import base
 from pymysql._compat import text_type
 from pymysql.constants import CLIENT
+
+# from tzlocal import get_localzone
+# from datetime import timezone
+
 
 import pytest
 
@@ -45,7 +51,6 @@ class TempUser:
 
 
 class TestAuthentication(base.PyMySQLTestCase):
-
     socket_auth = False
     socket_found = False
     two_questions_found = False
@@ -100,11 +105,15 @@ class TestAuthentication(base.PyMySQLTestCase):
     def test_plugin(self):
         conn = self.connect()
         if not self.mysql_server_is(conn, (5, 5, 0)):
+            conn.close()
             pytest.skip("MySQL-5.5 required for plugins")
-        cur = conn.cursor()
-        cur.execute("select plugin from mysql.user where concat(user, '@', host)=current_user()")
+        with conn as cur:
+            cur.execute(
+                "select plugin from mysql.user where concat(user, '@', host)=current_user()"
+            )
         for r in cur:
-            self.assertIn(conn._auth_plugin_name, (r[0], 'mysql_native_password'))
+                self.assertIn(conn._auth_plugin_name, (r[0], "mysql_native_password"))
+        conn.close()
 
     @pytest.mark.skipif(not socket_auth, reason="connection to unix_socket required")
     @pytest.mark.skipif(socket_found, reason="socket plugin already installed")
@@ -201,10 +210,19 @@ class TestAuthentication(base.PyMySQLTestCase):
 
     def realTestDialogAuthTwoQuestions(self):
         TestAuthentication.Dialog.fail=False
-        TestAuthentication.Dialog.m = {b'Password, please:': b'notverysecret',
-                                       b'Are you sure ?': b'yes, of course'}
-        with TempUser(self.connect().cursor(), 'pymysql_2q@localhost',
-                      self.databases[0]['db'], 'two_questions', 'notverysecret') as u:
+        TestAuthentication.Dialog.m = {
+            b"Password, please:": b"notverysecret",
+            b"Are you sure ?": b"yes, of course",
+        }
+        with TempUser(
+            self.connect().cursor(),
+            "pymysql_2q@localhost",
+            self.databases[0]["db"],
+            "two_questions",
+            "notverysecret",
+        ) as u:
+            # This raises aborted connection but I can't tease out how to
+            # design this better
             with self.assertRaises(pymysql.err.OperationalError):
                 pymysql.connect(user='pymysql_2q', **self.db)
             pymysql.connect(user='pymysql_2q', auth_plugin_map={b'dialog': TestAuthentication.Dialog}, **self.db)
@@ -369,7 +387,7 @@ class TestAuthentication(base.PyMySQLTestCase):
             c.execute("FLUSH PRIVILEGES")
             db = self.db.copy()
             db['password'] = "Sh@256Pa33"
-            # Although SHA256 is supported, need the configuration of public key of the mysql server. Currently will get error by this test. 
+            # Although SHA256 is supported, need the configuration of public key of the mysql server. Currently will get error by this test.
             with self.assertRaises(pymysql.err.OperationalError):
                 pymysql.connect(user='pymysql_sha256', **db)
 
@@ -380,13 +398,13 @@ class TestConnection(base.PyMySQLTestCase):
         arg = self.databases[0].copy()
         arg['charset'] = 'utf8mb4'
         conn = pymysql.connect(**arg)
+        conn.close()
 
     def test_largedata(self):
         """Large query and response (>=16MB)"""
         cur = self.connect().cursor()
         cur.execute("SELECT @@max_allowed_packet")
         if cur.fetchone()[0] < 16*1024*1024 + 10:
-            print("Set max_allowed_packet to bigger than 17MB")
             return
         t = 'a' * (16*1024*1024)
         cur.execute("SELECT '" + t + "'")
@@ -396,14 +414,15 @@ class TestConnection(base.PyMySQLTestCase):
         con = self.connect()
         self.assertFalse(con.get_autocommit())
 
-        cur = con.cursor()
-        cur.execute("SET AUTOCOMMIT=1")
-        self.assertTrue(con.get_autocommit())
+        with con as cur:
+            cur.execute("SET AUTOCOMMIT=1")
+            self.assertTrue(con.get_autocommit())
 
-        con.autocommit(False)
-        self.assertFalse(con.get_autocommit())
-        cur.execute("SELECT @@AUTOCOMMIT")
-        self.assertEqual(cur.fetchone()[0], 0)
+            con.autocommit(False)
+            self.assertFalse(con.get_autocommit())
+            cur.execute("SELECT @@AUTOCOMMIT")
+            self.assertEqual(cur.fetchone()[0], 0)
+        con.close()
 
     def test_select_db(self):
         con = self.connect()
@@ -424,14 +443,16 @@ class TestConnection(base.PyMySQLTestCase):
         http://dev.mysql.com/doc/refman/5.0/en/error-messages-client.html#error_cr_server_gone_error
         """
         con = self.connect()
-        cur = con.cursor()
+        with con as cur:
         cur.execute("SET wait_timeout=1")
+            # This causes Warning Aborted connection, intended but really annoying
         time.sleep(2)
         with self.assertRaises(pymysql.OperationalError) as cm:
             cur.execute("SELECT 1+1")
         # error occures while reading, not writing because of socket buffer.
         #self.assertEqual(cm.exception.args[0], 2006)
         self.assertIn(cm.exception.args[0], (2006, 2013))
+        con.close()
 
     def test_init_command(self):
         conn = self.connect(
@@ -444,16 +465,40 @@ class TestConnection(base.PyMySQLTestCase):
         with self.assertRaises(pymysql.err.Error):
             conn.ping(reconnect=False)
 
+    def test_init_command_timezone(self):
+        conn = self.connect(init_command='set @session.time_zone="0:00";')
+        # client_flag = CLIENT.MULTI_STATEMENTS,
+        c = conn.cursor()
+        my_tz_name = "/".join(os.path.realpath("/US/Eastern").split("/")[-2:])
+        my_tz = pytz.timezone(my_tz_name)
+        # my_time = datetime.datetime.utcnow().replace(tzinfo=timezone.utc)
+        local_time = datetime.datetime.now()
+        local_tz = local_time.replace(tzinfo=my_tz)
+        c.execute("select @@system_time_zone;")
+        test_tz = c.fetchone()[0]
+
+        assert test_tz == "UTC"
+        assert test_tz != local_tz
+
     def test_read_default_group(self):
         conn = self.connect(
             read_default_group='client',
         )
         self.assertTrue(conn.open)
 
+<<<<<<< variant A
+>>>>>>> variant B
+    # def test_change_user(self):
+    #     # If you change, change back
+    #     con = self.connect()
+    #     assert con.change_user("test2", "some password", "test2")
+
+======= end
     def test_set_charset(self):
         c = self.connect()
         c.set_charset('utf8mb4')
         # TODO validate setting here
+        c.close()
 
     def test_defer_connect(self):
         import socket
@@ -583,4 +628,3 @@ class TestEscape(base.PyMySQLTestCase):
 
         assert
         # with pytest.raises(Exception):
-
