@@ -129,22 +129,6 @@ class CursorTest(base.PyMySQLTestCase):
             finally:
                 cursor.execute("DROP TABLE IF EXISTS percent_test")
 
-    def happy_path_executed_three_column(self):
-        conn = self.connect()
-        self.safe_create_table(
-            conn, "mine2", "create table mine2 (column1 int, column2 int, column3 int)"
-        )
-
-        with conn as cursor:
-            cursor.execute(
-                "insert into mine2 (column1, column2, column3) values "
-                "(1,2)"
-            )
-
-        with conn as c3:
-            c3.execute("select 3")
-            self.assertEqual(c3.fetchall(), (1, 2, 3))
-            self.assertIsNone(c3.fetchone())
 
 class PreparedCursorTest(base.PyMySQLTestCase):
     def test_happy_PreparedCursor(self):

@@ -437,23 +437,22 @@ class TestConnection(base.PyMySQLTestCase):
         cur.execute('SELECT database()')
         self.assertEqual(cur.fetchone()[0], other_db)
 
-#    def test_connection_gone_away(self):
-#        """
-#        http://dev.mysql.com/doc/refman/5.0/en/gone-away.html
-#        http://dev.mysql.com/doc/refman/5.0/en/error-messages-client.html#error_cr_server_gone_error
-#        """
-#        con = self.connect()
-#        with con as cur:
-#            cur.execute("SET wait_timeout=1")
-#            # This causes Warning Aborted connection, intended but really annoying
-#            time.sleep(2)
-#        with self.assertRaises(pymysql.OperationalError) as cm:
-#            cur.execute("SELECT 1+1")
-#        # error occures while reading, not writing because of socket buffer.
-#        #self.assertEqual(cm.exception.args[0], 2006)
-#        self.assertIn(cm.exception.args[0], (2006, 2013))
-#        con.close()
-
+    def test_connection_gone_away(self):
+        """
+        http://dev.mysql.com/doc/refman/5.0/en/gone-away.html
+        http://dev.mysql.com/doc/refman/5.0/en/error-messages-client.html#error_cr_server_gone_error
+        """
+        con = self.connect()
+        with con as cur:
+        cur.execute("SET wait_timeout=1")
+            # This causes Warning Aborted connection, intended but really annoying
+        time.sleep(2)
+        with self.assertRaises(pymysql.OperationalError) as cm:
+            cur.execute("SELECT 1+1")
+        # error occures while reading, not writing because of socket buffer.
+        #self.assertEqual(cm.exception.args[0], 2006)
+        self.assertIn(cm.exception.args[0], (2006, 2013))
+        con.close()
 
     def test_init_command(self):
         conn = self.connect(
@@ -487,13 +486,14 @@ class TestConnection(base.PyMySQLTestCase):
         )
         self.assertTrue(conn.open)
 
-
+<<<<<<< variant A
+>>>>>>> variant B
     # def test_change_user(self):
     #     # If you change, change back
     #     con = self.connect()
     #     assert con.change_user("test2", "some password", "test2")
 
-
+======= end
     def test_set_charset(self):
         c = self.connect()
         c.set_charset('utf8mb4')
@@ -633,4 +633,10 @@ class TestEscape(base.PyMySQLTestCase):
 
         assert type(test_file) is str
 
+    def test_bad_send_data(self):
+        # create a test to see if invalid input causes a failure
+        con = self.connect()
+        cur = con.cursor()
 
+        assert
+        # with pytest.raises(Exception):
