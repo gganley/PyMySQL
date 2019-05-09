@@ -128,7 +128,45 @@ class CursorTest(base.PyMySQLTestCase):
                 )
             finally:
                 cursor.execute("DROP TABLE IF EXISTS percent_test")
+    
+    def test_happy_execute_one_column(self):
 
+        conn = self.connect()
+        self.safe_create_table(
+            conn, "mine", "create table mine (column1 int)"
+        )
+        with conn as cursor:
+            cursor.execute(
+                "insert into mine (column1) values "
+                "(1)"
+            )
+        with conn as c2:
+            c2.execute("select 1")
+            self.assertEqual(c2.fetchone(), (1,))
+            self.assertIsNone(c2.fetchone())
+
+    def happy_path_executed_two_column(self):
+        conn = self.connect()
+        self.safe_create_table(
+            conn, "mine2", "create table mine2 (column1 int, column2 int)"
+        )
+
+        with conn as cursor:
+            cursor.execute(
+                "insert into mine2 (column1, column2) values "
+                "(1,2)"
+            )
+
+        with conn as c2:
+            c2.execute("select 2")
+            self.assertEqual(c2.fetchall(), (1, 2))
+            self.assertIsNone(c2.fetchone())
+
+    def test_cursor_closed(self):
+        conn = self.connect()
+        cursor = conn.connect()
+        conn.close()
+        assert cursor is None
 
 class PreparedCursorTest(base.PyMySQLTestCase):
     def test_happy_PreparedCursor(self):
@@ -138,7 +176,6 @@ class PreparedCursorTest(base.PyMySQLTestCase):
         conn.cursorclass = pymysql.PreparedCursor
         self.safe_create_table(conn, "test", "create table test (column1 varchar(10))")
 
-        # cursor = conn.cursor()
         prepared_cursor = conn.cursor()
 
         stmt = "insert into test (column1) VALUES (%s)"
@@ -225,7 +262,7 @@ class PreparedCursorTest(base.PyMySQLTestCase):
             conn, "test4", "create table test4 (column1 varchar(10))"
         )
 
-        # cursor = conn.cursor()
+
         prepared_cursor = conn.cursor()
 
         stmt = "insert into test4 (column1) VALUES (%s)"
