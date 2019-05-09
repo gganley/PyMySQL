@@ -5,6 +5,7 @@ services:
     image: mysql:5
     ports:
       - "33061:3306"
+    restart: always
     volumes:
       - ./init:/docker-entrypoint-initdb.d/:ro
     environment:

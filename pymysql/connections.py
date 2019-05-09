@@ -1382,20 +1382,55 @@ class LoadLocalFile(object):
             raise err.InterfaceError("(0, '')")
         conn = self.connection
 
-        try:
-            with open(self.filename, "rb") as open_file:
-                packet_size = min(
-                    conn.max_allowed_packet, 16 * 1024
-                )  # 16KB is efficient enough
-                while True:
-                    chunk = open_file.read(packet_size)
-                    if not chunk:
-                        break
-                    conn.write_packet(chunk)
-        except IOError:
-            raise err.OperationalError(
-                1017, "Can't find file '{0}'".format(self.filename)
-            )
-        finally:
-            # send the empty packet to signify we are done sending data
-            conn.write_packet(b"")
+        # Check if LoadLocalFile is taking in a file like object
+
+        # os.path.isfile from os, checks if input is a file
+        file_exists = os.path.isfile("/path/to/file")
+
+        if file_exists:
+            # Store configuration file values from existing function
+            open_file = self.filename
+            packet_size = min(
+                conn.max_allowed_packet, 16 * 1024
+            )  # 16KB is efficient enough
+            while True:
+                chunk = open_file.read(packet_size)
+                if not chunk:
+                    break
+                conn.write_packet(chunk)
+
+        # isinstance( ... , io.TextIOBase) from io, checks if input is type stringIO
+        stringIO_exists = isinstance(self, io.TextIOBase)
+
+        if stringIO_exists:
+            # Store configuration file values from existing function
+            open_file = self.filename
+            packet_size = min(
+                conn.max_allowed_packet, 16 * 1024
+            )  # 16KB is efficient enough
+            while True:
+                chunk = open_file.read(packet_size)
+                if not chunk:
+                    break
+                conn.write_packet(chunk)
+
+        # Keep presets for taking in object
+        else:
+
+            try:
+                with open(self.filename, "rb") as open_file:
+                    packet_size = min(
+                        conn.max_allowed_packet, 16 * 1024
+                    )  # 16KB is efficient enough
+                    while True:
+                        chunk = open_file.read(packet_size)
+                        if not chunk:
+                            break
+                        conn.write_packet(chunk)
+            except IOError:
+                raise err.OperationalError(
+                    1017, "Can't find file '{0}'".format(self.filename)
+                )
+            finally:
+                # send the empty packet to signify we are done sending data
+                conn.write_packet(b"")
