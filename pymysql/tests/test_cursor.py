@@ -128,45 +128,47 @@ class CursorTest(base.PyMySQLTestCase):
                 )
             finally:
                 cursor.execute("DROP TABLE IF EXISTS percent_test")
-    
-    def test_happy_execute_one_column(self):
 
+    def test_happy_execute_one_column(self):
         conn = self.connect()
-        self.safe_create_table(
-            conn, "mine", "create table mine (column1 int)"
-        )
+        self.safe_create_table(conn, "mine", "create table mine (column1 int)")
         with conn as cursor:
-            cursor.execute(
-                "insert into mine (column1) values "
-                "(1)"
-            )
+            cursor.execute("insert into mine (column1) values (%s)", (1,))
         with conn as c2:
-            c2.execute("select 1")
+            c2.execute("select * from mine")
             self.assertEqual(c2.fetchone(), (1,))
             self.assertIsNone(c2.fetchone())
 
-    def happy_path_executed_two_column(self):
+    def test_happy_path_executed_two_column(self):
         conn = self.connect()
-        self.safe_create_table(
-            conn, "mine2", "create table mine2 (column1 int, column2 int)"
-        )
+        self.safe_create_table(conn, "mine2", "create table mine2 (column1 int, column2 int)")
 
         with conn as cursor:
-            cursor.execute(
-                "insert into mine2 (column1, column2) values "
-                "(1,2)"
-            )
+            cursor.execute("insert into mine2 (column1, column2) values (%s,%s)", (1,2,))
 
         with conn as c2:
-            c2.execute("select 2")
-            self.assertEqual(c2.fetchall(), (1, 2))
+            c2.execute("select * from mine2")
+            self.assertEqual(c2.fetchone(), (1, 2,))
             self.assertIsNone(c2.fetchone())
+
+    def happy_path_executed_three_column(self):
+        conn = self.connect()
+        self.safe_create_table(conn, "mine3", "create table mine3 (column1 int, column2 int, column3 int)")
+
+        with conn as cursor:
+            cursor.execute("insert into mine3 (column1, column2, column3) values (%s,%s,%s)", (1,2,3,))
+
+        with conn as c3:
+            c3.execute("select * from mine3")
+            self.assertEqual(c3.fetchone(), (1, 2, 3))
+            self.assertIsNone(c3.fetchone())
 
     def test_cursor_closed(self):
         conn = self.connect()
         cursor = conn.connect()
         conn.close()
         assert cursor is None
+
 
 class PreparedCursorTest(base.PyMySQLTestCase):
     def test_happy_PreparedCursor(self):
