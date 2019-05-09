@@ -486,14 +486,6 @@ class TestConnection(base.PyMySQLTestCase):
         )
         self.assertTrue(conn.open)
 
-<<<<<<< variant A
->>>>>>> variant B
-    # def test_change_user(self):
-    #     # If you change, change back
-    #     con = self.connect()
-    #     assert con.change_user("test2", "some password", "test2")
-
-======= end
     def test_set_charset(self):
         c = self.connect()
         c.set_charset('utf8mb4')
@@ -622,21 +614,3 @@ class TestEscape(base.PyMySQLTestCase):
         con.commit()
         cur.execute("SELECT 3")
         self.assertEqual(cur.fetchone()[0], 3)
-
-    # no tests for send_data must create new ones
-    def test_happy_send_data(self):
-        # create a test to check if text file being passed in returns true
-        con = self.connect()
-        cur = con.cursor()
-
-        test_file = "test1.txt"
-
-        assert type(test_file) is str
-
-    def test_bad_send_data(self):
-        # create a test to see if invalid input causes a failure
-        con = self.connect()
-        cur = con.cursor()
-
-        assert
-        # with pytest.raises(Exception):
